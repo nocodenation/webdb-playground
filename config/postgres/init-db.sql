@@ -156,4 +156,74 @@ WHEN undefined_column THEN
 END;
 $$;
 
+
+CREATE OR REPLACE FUNCTION public.deploy_function(
+    function_name TEXT,
+    function_body TEXT,
+    function_params TEXT DEFAULT '',
+    return_type TEXT DEFAULT 'JSONB',
+    function_language TEXT DEFAULT 'plpgsql',
+    replace_existing BOOLEAN DEFAULT TRUE
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+full_function_name TEXT;
+    create_statement TEXT;
+    result JSONB;
+BEGIN
+    -- Validate function name (basic security check)
+    IF function_name !~ '^[a-z_][a-z0-9_]*$' THEN
+        RAISE EXCEPTION 'Invalid function name: must be lowercase alphanumeric with underscores';
+END IF;
+
+    -- Validate language
+    IF function_language NOT IN ('plpgsql', 'sql') THEN
+        RAISE EXCEPTION 'Only plpgsql and sql languages are allowed';
+END IF;
+
+    -- Build the full function name in public schema
+    full_function_name := 'public.' || function_name;
+
+    -- Build the CREATE FUNCTION statement
+    create_statement := format(
+        'CREATE %s FUNCTION %s(%s) RETURNS %s LANGUAGE %s AS %L',
+        CASE WHEN replace_existing THEN 'OR REPLACE' ELSE '' END,
+        full_function_name,
+        function_params,
+        return_type,
+        function_language,
+        function_body
+    );
+
+    -- Execute the dynamic SQL
+EXECUTE create_statement;
+
+-- Change owner to api_user so it gets exposed via PostgREST
+EXECUTE format('ALTER FUNCTION %s OWNER TO api_user', full_function_name);
+
+-- Return success info
+result := jsonb_build_object(
+        'success', TRUE,
+        'function_name', full_function_name,
+        'endpoint', 'https://rest.mywebdb.liquid.mx/rpc/' || function_name,
+        'created_at', NOW()
+    );
+
+RETURN result;
+
+EXCEPTION WHEN OTHERS THEN
+    RETURN jsonb_build_object(
+        'success', FALSE,
+        'error', SQLERRM,
+        'function_name', function_name
+    );
+END;
+$$;
+
+ALTER FUNCTION public.deploy_function OWNER TO api_user;
+
+
 CREATE EXTENSION vector;
