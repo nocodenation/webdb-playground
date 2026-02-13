@@ -1,0 +1,107 @@
+services:
+  pgadmin_db:
+    image: postgres:17
+    container_name: pgadmin_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: {{ PGADMIN_DATABASE_PASSWORD }}
+    volumes:
+      - ./volumes/pgadmin_db/data:/var/lib/postgresql/data:z
+      - ./config/pgadmin_db/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - nocodenation_playground_network
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: postgres
+    restart: unless-stopped
+    user: "0:0"
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: api_user
+      POSTGRES_PASSWORD: {{ DATABASE_PASSWORD }}
+    volumes:
+      - ./volumes/postgres/data:/var/lib/postgresql/data:z
+      - ./config/postgres/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - nocodenation_playground_network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    restart: unless-stopped
+    user: "0:0"
+    volumes:
+      - ./volumes/pgadmin:/var/lib/pgadmin:z
+      - ./volumes/pgadmin_log:/var/log/pgadmin:z
+      - ./config/pgadmin/config_distro.py:/pgadmin4/config_distro.py
+      - ./config/pgadmin/config_local.py:/pgadmin4/config_local.py
+      - ./config/pgadmin/webserver.py:/pgadmin4/pgadmin/authenticate/webserver.py
+      - ./config/pgadmin/servers.json:/pgadmin4/servers.json
+      - ./config/pgadmin/pgpass:/pgadmin4/pgpass
+    depends_on:
+        pgadmin_db:
+          condition: service_healthy
+        postgres:
+          condition: service_healthy
+    ports:
+      - "8100:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@dilcher.de
+      PGADMIN_DEFAULT_PASSWORD: THIS_PASSWORD_IS_ACTUALLY_NOT_USED_BY_THE_SYSTEM
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+      PGADMIN_CONFIG_WTF_CSRF_ENABLED: "False"
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+      PGADMIN_PASSFILE_PATH: /pgadmin4/pgpass
+    networks:
+      - nocodenation_playground_network
+
+  postgrest:
+    image: postgrest/postgrest
+    container_name: postgrest
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://api_user:{{ DATABASE_PASSWORD }}@postgres:5432/postgres
+      PGRST_DB_SCHEMA: public
+      PGRST_DB_ANON_ROLE: api_anon
+#      PGRST_OPENAPI_SERVER_PROXY_URI: https://{{ ports.PostgREST.url }} # Maybe not needed
+#      PGRST_OPENAPI_SECURITY_ACTIVE: True
+      PGRST_JWT_SECRET: {{ POSTGREST_JWT_SECTET }}
+    ports:
+      - "8101:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - nocodenation_playground_network
+
+  swagger:
+    image: swaggerapi/swagger-ui
+    container_name: swagger
+    restart: unless-stopped
+    environment:
+      API_URL: http://localhost:8101/
+    ports:
+      - "8102:8080"
+    depends_on:
+      - postgrest
+    networks:
+      - nocodenation_playground_network
+
+networks:
+  nocodenation_playground_network:
+    name: nocodenation_playground_network
