@@ -61,8 +61,8 @@ services:
 #    ports:
 #      - "8100:80"
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@dilcher.de
-      PGADMIN_DEFAULT_PASSWORD: THIS_PASSWORD_IS_ACTUALLY_NOT_USED_BY_THE_SYSTEM
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
       PGADMIN_CONFIG_WTF_CSRF_ENABLED: "False"
       PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
@@ -117,3 +117,4 @@ services:
 networks:
   nocodenation_playground_network:
     name: nocodenation_playground_network
+    external: true
