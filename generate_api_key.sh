@@ -30,7 +30,7 @@ token="${header}.${payload}.${signature}"
 
 # Update API_KEY in .env
 if grep -q '^API_KEY=' "$ENV_FILE"; then
-  sed -i "s|^API_KEY=.*|API_KEY=\"${token}\"|" "$ENV_FILE"
+  sed -i '' "s|^API_KEY=.*|API_KEY=\"${token}\"|" "$ENV_FILE"
 else
   echo "API_KEY=\"${token}\"" >> "$ENV_FILE"
 fi
