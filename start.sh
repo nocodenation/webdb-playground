@@ -21,6 +21,14 @@ echo "Stopping existing containers..."
 echo "Generating API key..."
 "${SCRIPT_DIR}/generate_api_key.sh"
 
+sed_inplace() {
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
+}
+
 # 3. Render a template file by replacing {{ VAR_NAME }} placeholders with .env values
 render_template() {
   local content
@@ -50,14 +58,22 @@ for template in "${NGINX_TEMPLATES_DIR}"/*; do
   render_template "$template" > "${NGINX_OUTPUT_DIR}/${filename}"
   # Replace API_KEY_PLACEHOLDER with API_KEY from .env
   API_KEY="$(grep -E '^API_KEY=' "$ENV_FILE" | cut -d'=' -f2- | tr -d '"')"
-  sed -i '' "s|API_KEY_PLACEHOLDER|${API_KEY}|g" "${NGINX_OUTPUT_DIR}/${filename}"
+  sed_inplace "s|API_KEY_PLACEHOLDER|${API_KEY}|g" "${NGINX_OUTPUT_DIR}/${filename}"
 done
 
 
-# 5. Ensure shared network exists
+# 5. Ensure log directories exist and are writable by containers that
+#    run as non-root (pgadmin_db, postgrest, nginx workers).
+LOGS_DIR="${SCRIPT_DIR}/volumes/logs"
+for svc in postgres pgadmin_db pgadmin proxy swagger; do
+  mkdir -p "${LOGS_DIR}/${svc}"
+  chmod 0777 "${LOGS_DIR}/${svc}"
+done
+
+# 6. Ensure shared network exists
 docker network inspect nocodenation_playground_network >/dev/null 2>&1 \
   || docker network create nocodenation_playground_network
 
-# 6. Start containers
+# 7. Start containers
 echo "Starting containers..."
 docker compose up -d
