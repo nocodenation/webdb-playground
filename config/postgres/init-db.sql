@@ -208,7 +208,7 @@ EXECUTE format('ALTER FUNCTION %s OWNER TO api_user', full_function_name);
 result := jsonb_build_object(
         'success', TRUE,
         'function_name', full_function_name,
-        'endpoint', 'https://rest.mywebdb.liquid.mx/rpc/' || function_name,
+        'endpoint', 'http://postgrest_app:3000/rpc/' || function_name,
         'created_at', NOW()
     );
 

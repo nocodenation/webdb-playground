@@ -45,17 +45,21 @@ render_template() {
 for template in "${PGADMIN_TEMPLATES_DIR}"/*; do
   [[ -f "$template" ]] || continue
   filename="$(basename "$template")"
+  outfile="${PGADMIN_OUTPUT_DIR}/${filename}"
   echo "Rendering pgadmin template: ${filename}"
-  render_template "$template" > "${PGADMIN_OUTPUT_DIR}/${filename}"
+  rm -f "$outfile"
+  render_template "$template" > "$outfile"
 done
 
 # 4. Render nginx templates
 for template in "${NGINX_TEMPLATES_DIR}"/*; do
   [[ -f "$template" ]] || continue
   filename="$(basename "$template")"
-  echo "Rendering nginx template: ${filename}"
   mkdir -p "$NGINX_OUTPUT_DIR"
-  render_template "$template" > "${NGINX_OUTPUT_DIR}/${filename}"
+  outfile="${NGINX_OUTPUT_DIR}/${filename}"
+  echo "Rendering nginx template: ${filename}"
+  rm -f "$outfile"
+  render_template "$template" > "$outfile"
   # Replace API_KEY_PLACEHOLDER with API_KEY from .env
   API_KEY="$(grep -E '^API_KEY=' "$ENV_FILE" | cut -d'=' -f2- | tr -d '"')"
   sed_inplace "s|API_KEY_PLACEHOLDER|${API_KEY}|g" "${NGINX_OUTPUT_DIR}/${filename}"
