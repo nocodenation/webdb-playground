@@ -160,6 +160,7 @@ services:
     volumes:
       - .:/workspace
       - ./config/opencode/instructions.md:/opencode/instructions.md:ro
+      - ./config/opencode/skills:/opencode/skills:ro
       - ./volumes/logs/postgres:/logs/postgres:ro
       - ./volumes/logs/pgadmin_db:/logs/pgadmin_db:ro
       - ./volumes/logs/pgadmin:/logs/pgadmin:ro
