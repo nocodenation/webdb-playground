@@ -15,7 +15,7 @@ fi
 
 # 1. Stop existing containers
 echo "Stopping existing containers..."
-"${SCRIPT_DIR}/stop.sh"
+"${SCRIPT_DIR}/down.sh"
 
 # 2. Generate API key (updates API_KEY in .env)
 echo "Generating API key..."
