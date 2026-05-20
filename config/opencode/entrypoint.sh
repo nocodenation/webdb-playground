@@ -77,12 +77,5 @@ printf '{
   }
 }\n' "$OPENCODE_FULL_MODEL" "$_PROVIDERS" "$OPENCODE_PORT" > "/root/.config/opencode/opencode.json"
 
-if [ -n "${OPENCODE_PASSWORD}" ]; then
-    export OPENCODE_SERVER_PASSWORD="${OPENCODE_PASSWORD}"
-fi
-if [ -n "${OPENCODE_USERNAME}" ]; then
-    export OPENCODE_SERVER_USERNAME="${OPENCODE_USERNAME}"
-fi
-
 echo "Starting opencode web on port $OPENCODE_PORT (model: $OPENCODE_FULL_MODEL)"
 exec opencode web

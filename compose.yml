@@ -158,7 +158,6 @@ services:
       OPENCODE_TIMEOUT: ${OPENCODE_TIMEOUT:-600000}
       OPENCODE_CHUNK_TIMEOUT: ${OPENCODE_CHUNK_TIMEOUT:-120000}
     volumes:
-      - .:/workspace
       - ./config/opencode/instructions.md:/opencode/instructions.md:ro
       - ./config/opencode/skills:/opencode/skills:ro
       - ./volumes/logs/postgres:/logs/postgres:ro
@@ -166,8 +165,23 @@ services:
       - ./volumes/logs/pgadmin:/logs/pgadmin:ro
       - ./volumes/logs/proxy:/logs/proxy:ro
       - ./volumes/logs/swagger:/logs/swagger:ro
+      - ./volumes/app:/app
     networks:
       - nocodenation_playground_network
+
+  bun_runner:
+    image: docker.env.liquidvu.com/bun-app:latest
+    container_name: bun_runner
+    restart: unless-stopped
+    volumes:
+      - ./volumes/app:/app
+      - ./volumes/build_info:/build_info
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '> /dev/tcp/127.0.0.1/3000'"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 5m
 
 networks:
   nocodenation_playground_network:
