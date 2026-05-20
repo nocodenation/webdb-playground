@@ -135,3 +135,11 @@ When asked about logs for any service, check `/logs`:
 | `/logs/pgadmin` | pgAdmin web UI |
 | `/logs/proxy` | nginx reverse proxy |
 | `/logs/swagger` | Swagger UI |
+
+---
+
+## Application
+
+When asked to create or update application, UI, node app, bun app or somentring like that - create an SSR React application and put that into `/app` folder.
+Each edit should increase "version" in `package.json` file of that app
+
