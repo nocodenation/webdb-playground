@@ -173,6 +173,8 @@ services:
     image: docker.env.liquidvu.com/bun-app:latest
     container_name: bun_runner
     restart: unless-stopped
+    ports:
+      - "8104:3000"
     volumes:
       - ./volumes/app:/app
       - ./volumes/build_info:/build_info
