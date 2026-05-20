@@ -82,8 +82,8 @@ docker network inspect nocodenation_playground_network >/dev/null 2>&1 \
 echo "Starting containers..."
 docker compose up -d
 
-echo "pgAdmin is available on:        http://localhost:8100"
-echo "REST interface is available on: http://localhost:8101"
-echo "Swagger UI is available on:     http://localhost:8102"
-echo "OpenCode is available on:       http://localhost:8103"
-echo "Node app is available on:       http://localhost:8104"
+echo "pgAdmin is available on:          http://localhost:8100"
+echo "REST interface is available on:   http://localhost:8101"
+echo "Swagger UI is available on:       http://localhost:8102"
+echo "OpenCode is available on:         http://localhost:8103"
+echo "Node app is available on:         http://localhost:8104"
