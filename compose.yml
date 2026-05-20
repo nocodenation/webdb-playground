@@ -170,7 +170,7 @@ services:
       - nocodenation_playground_network
 
   bun_runner:
-    image: docker.env.liquidvu.com/bun-app:latest
+    image: docker.env.liquidvu.com/bun-runner-5s:latest
     container_name: bun_runner
     restart: unless-stopped
     ports:
