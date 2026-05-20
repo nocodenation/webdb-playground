@@ -24,10 +24,10 @@ External ports on the host: pgAdmin → 8100, PostgREST → 8101, Swagger → 81
 
 ## Authentication
 
-All PostgREST requests require a JWT bearer token. Read it from the workspace:
+All PostgREST requests require a JWT bearer token. It is available as an environment variable:
 
 ```bash
-grep '^API_KEY=' /workspace/.env | cut -d'=' -f2-
+echo $POSTGREST_API_KEY
 ```
 
 Use it as: `Authorization: Bearer <token>`

@@ -157,6 +157,7 @@ services:
       OPENCODE_OLLAMA_HOST: ${OPENCODE_OLLAMA_HOST:-}
       OPENCODE_TIMEOUT: ${OPENCODE_TIMEOUT:-600000}
       OPENCODE_CHUNK_TIMEOUT: ${OPENCODE_CHUNK_TIMEOUT:-120000}
+      POSTGREST_API_KEY: ${API_KEY:-}
     volumes:
       - ./config/opencode/instructions.md:/opencode/instructions.md:ro
       - ./config/opencode/skills:/opencode/skills:ro
