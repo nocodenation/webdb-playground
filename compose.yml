@@ -165,6 +165,7 @@ services:
       - ./volumes/logs/pgadmin:/logs/pgadmin:ro
       - ./volumes/logs/proxy:/logs/proxy:ro
       - ./volumes/logs/swagger:/logs/swagger:ro
+      - ./volumes/logs/bun_runner:/logs/bun_runner:ro
       - ./volumes/app:/app
     networks:
       - nocodenation_playground_network
@@ -178,6 +179,7 @@ services:
     volumes:
       - ./volumes/app:/app
       - ./volumes/build_info:/build_info
+      - ./volumes/logs/bun_runner:/logs
     healthcheck:
       test: ["CMD-SHELL", "bash -c '> /dev/tcp/127.0.0.1/3000'"]
       interval: 30s

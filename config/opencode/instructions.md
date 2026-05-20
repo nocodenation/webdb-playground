@@ -128,18 +128,20 @@ the `pgrst_watch` event trigger).
 
 When asked about logs for any service, check `/logs`:
 
-| Path | Service |
-|---|---|
-| `/logs/postgres` | PostgreSQL |
-| `/logs/pgadmin_db` | pgAdmin metadata database |
-| `/logs/pgadmin` | pgAdmin web UI |
-| `/logs/proxy` | nginx reverse proxy |
-| `/logs/swagger` | Swagger UI |
+| Path               | Service                                                                            |
+|--------------------|------------------------------------------------------------------------------------|
+| `/logs/postgres`   | PostgreSQL                                                                         |
+| `/logs/pgadmin_db` | pgAdmin metadata database                                                          |
+| `/logs/pgadmin`    | pgAdmin web UI                                                                     |
+| `/logs/proxy`      | nginx reverse proxy                                                                |
+| `/logs/swagger`    | Swagger UI                                                                         |
+| `/logs/bun_runner` | Bun Runner (Node Application, Bun Application, UI, Bun UI, Built Application) logs |
 
 ---
 
 ## Application
 
 When asked to create or update application, UI, node app, bun app or somentring like that - create an SSR React application and put that into `/app` folder.
-Each edit should increase "version" in `package.json` file of that app
+Each edit should increase "version" in `package.json` file of that app.
+If user asks about issues of the application check logs located in `/logs/bun_runner` the see issues with installing dependencies, building application or running application
 
