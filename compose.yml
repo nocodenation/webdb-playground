@@ -183,6 +183,8 @@ services:
       - ./volumes/data:/data
       - ./volumes/build_info:/build_info
       - ./volumes/logs/bun_runner:/logs
+    environment:
+      POSTGREST_API_KEY: ${API_KEY:-}
     healthcheck:
       test: ["CMD-SHELL", "bash -c '> /dev/tcp/127.0.0.1/3000'"]
       interval: 30s
