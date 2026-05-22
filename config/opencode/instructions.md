@@ -81,7 +81,8 @@ curl -s -X POST http://postgrest_app:3000/rpc/create_table \
 ```
 
 Supported column types: `string` → text, `number` → numeric, `datetime` → timestamp,
-`vector` → vector(768), `seqnumber` → numeric with auto-increment sequence.
+`vector` → bit(4096), `seqnumber` → numeric with auto-increment sequence.
+See the **Embeddings** section below for how `vector` columns are populated.
 
 ### `create_vector_index` — add an HNSW index on a vector column
 
@@ -91,6 +92,22 @@ curl -s -X POST http://postgrest_app:3000/rpc/create_vector_index \
   -H "Content-Type: application/json" \
   -d '{"p_table_name": "my_table", "p_embedding_column_name": "embedding"}'
 ```
+
+### `find_closest_vector` — K-nearest-neighbour search over a `vector` column
+
+Generic similarity search over any table with a `vector` (`bit(4096)`) column.
+`p_query` is a 4096-character bit string produced by embedding and binarizing the
+search text (see the **Embeddings** section).
+
+```bash
+curl -s -X POST http://postgrest_app:3000/rpc/find_closest_vector \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"p_table_name": "docs", "p_embedding_column": "embedding", "p_query": "0101...", "p_k": 5}'
+```
+
+Returns a JSON array of the `p_k` nearest rows — the embedding column is omitted
+and a `distance` field is added (lower = more similar).
 
 ### `deploy_function` — create or replace a PostgreSQL function and expose it via PostgREST
 
@@ -121,6 +138,60 @@ the `pgrst_watch` event trigger).
 2. Draft the function body.
 3. Call `deploy_function` to create it.
 4. Verify by calling the new endpoint: `POST /rpc/<function_name>`.
+
+---
+
+## Embeddings
+
+A text-embedding model runs on a separate server and is reachable from this
+container via an OpenAI-compatible API. The endpoint and model name are
+environment variables:
+
+```bash
+echo $OPENCODE_EMBEDDING_HOST    # e.g. http://embedding_host:8801
+echo $OPENCODE_EMBEDDING_MODEL   # e.g. llama-embed-nemotron-8b
+```
+
+The model returns **4096-dimensional** float vectors. They are stored in the
+database as **binary-quantized** bit vectors (`bit(4096)`): each float becomes one
+bit — `1` if it is greater than `0`, otherwise `0`. This keeps vectors compact and
+lets pgvector build an HNSW index, which a plain `vector(4096)` cannot have (HNSW
+caps at 2000 float dimensions). Binary quantization depends only on the sign of
+each value, so whether the model's output is normalized does not matter.
+
+### Generate and binarize an embedding
+
+```bash
+curl -s -X POST "$OPENCODE_EMBEDDING_HOST/v1/embeddings" \
+  -H "Content-Type: application/json" \
+  -d "{\"model\": \"$OPENCODE_EMBEDDING_MODEL\", \"input\": \"text to embed\"}" \
+  | jq -r '(.data[0].embedding // .embedding) | map(if . > 0 then "1" else "0" end) | add'
+```
+
+This prints a 4096-character string of `0`/`1` — exactly the value to store in a
+`vector` column. The `(.data[0].embedding // .embedding)` filter accepts both the
+OpenAI-style (`/v1/embeddings`) and llama.cpp-native (`/embedding`) response shapes.
+
+### Vector search workflow
+
+1. Create a table with a `vector` column (`create_table` maps `vector` → `bit(4096)`):
+   ```json
+   {"p_table_name": "docs", "p_columns": {"id": "seqnumber", "content": "string", "embedding": "vector"}, "p_primary_keys": ["id"]}
+   ```
+2. For each row, embed its text, binarize it (command above), and insert the
+   resulting 4096-char bit string into the `embedding` column.
+3. Add an HNSW index with `create_vector_index` — it uses Hamming distance
+   (`bit_hamming_ops` / the `<~>` operator).
+4. To search, embed and binarize the query text the same way, then call the
+   built-in `find_closest_vector` RPC with the table name, embedding column, and
+   bit string:
+   ```bash
+   curl -s -X POST http://postgrest_app:3000/rpc/find_closest_vector \
+     -H "Authorization: Bearer <token>" \
+     -H "Content-Type: application/json" \
+     -d "{\"p_table_name\": \"docs\", \"p_embedding_column\": \"embedding\", \"p_query\": \"$BITS\", \"p_k\": 5}"
+   ```
+   It returns the nearest rows ordered by `distance` (lower = more similar).
 
 ---
 

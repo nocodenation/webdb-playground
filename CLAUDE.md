@@ -19,7 +19,7 @@ Five services on a shared `nocodenation_playground_network`:
 ## Key Files
 
 - `compose.yml` — Service definitions. Uses `{{ placeholder }}` template variables for secrets (`DATABASE_PASSWORD`, `PGADMIN_DATABASE_PASSWORD`, `REST_BEARER_TOKEN`).
-- `config/postgres/init-db.sql` — Main DB initialization: roles (`api_anon`, `authenticator`), schema reload trigger (`pgrst_watch`), `create_table()` RPC function (supports types: string, number, datetime, vector, seqnumber), `create_vector_index()` RPC function, and pgvector extension.
+- `config/postgres/init-db.sql` — Main DB initialization: roles (`api_anon`, `authenticator`), schema reload trigger (`pgrst_watch`), `create_table()` RPC function (supports types: string, number, datetime, vector, seqnumber), `create_vector_index()` RPC function, `deploy_function()` RPC function, `find_closest_vector()` RPC function, and pgvector extension.
 - `config/pgadmin_db/init-db.sql` — pgAdmin DB initialization: trigger to set default file upload size preference for new users.
 - `config/pgadmin/` — pgAdmin configuration: `config_local.py` (webserver auth, CSRF disabled), `webserver.py` (custom Flask auth module with auto-create user, server import on first login), `servers.json` (pre-configured server connection), `pgpass` (password file for auto-connect).
 - `config/pgadmin/templates/` — Template files: `config_distro.py` (DB URI with placeholder), `pgpass`.
@@ -53,7 +53,7 @@ Tables are created dynamically via the `create_table()` PostgREST RPC function. 
 - `string` → `text`
 - `number` → `numeric`
 - `datetime` → `timestamp`
-- `vector` → `vector(768)` (pgvector)
+- `vector` → `bit(4096)` (pgvector binary-quantized embedding)
 - `seqnumber` → `numeric` with auto-increment sequence
 
 All created tables are owned by `api_user` and accessible via PostgREST's REST API. Schema changes auto-notify PostgREST to reload via the `pgrst_watch` event trigger.

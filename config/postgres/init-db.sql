@@ -71,7 +71,7 @@ SELECT key, value FROM json_each_text(v_columns)
     WHEN 'string'     THEN v_pgtype := 'text';
 WHEN 'number'     THEN v_pgtype := 'numeric';
 WHEN 'datetime'   THEN v_pgtype := 'timestamp';
-WHEN 'vector'     THEN v_pgtype := 'vector(768)';
+WHEN 'vector'     THEN v_pgtype := 'bit(4096)';
 WHEN 'seqnumber'  THEN v_pgtype := 'numeric';
 ELSE RAISE EXCEPTION 'Unsupported type "%" for column "%". Supported: string, number, datetime, vector, seqnumber', v_val, v_key;
 END CASE;
@@ -144,7 +144,7 @@ BEGIN
       WHERE c.relname = v_idx_name AND n.nspname = v_schema
   ) THEN
       EXECUTE format(
-          'CREATE INDEX %I ON %I.%I USING hnsw (%I vector_l2_ops) WITH (m = 4, ef_construction = 10)',
+          'CREATE INDEX %I ON %I.%I USING hnsw (%I bit_hamming_ops) WITH (m = 4, ef_construction = 10)',
           v_idx_name, v_schema, p_table_name, p_embedding_column_name
       );
 END IF;
@@ -227,3 +227,47 @@ ALTER FUNCTION public.deploy_function OWNER TO api_user;
 
 
 CREATE EXTENSION vector;
+
+
+-- Function: find_closest_vector
+-- Generic K-nearest-neighbour search over any table with a bit(4096) column.
+-- p_query is a 4096-character bit string (the embedding, binary-quantized).
+-- Returns a JSONB array of the p_k nearest rows: the embedding column is
+-- omitted and a "distance" field is added (lower = more similar).
+CREATE OR REPLACE FUNCTION public.find_closest_vector(
+    p_table_name text,
+    p_embedding_column text,
+    p_query text,
+    p_k int DEFAULT 5
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  v_result jsonb;
+  v_sql text;
+BEGIN
+  v_sql := format(
+    'SELECT coalesce(jsonb_agg(obj ORDER BY d), ''[]''::jsonb)
+       FROM (
+         SELECT (to_jsonb(t) - %L)
+                || jsonb_build_object(''distance'', (t.%I <~> $1::bit(4096))) AS obj,
+                (t.%I <~> $1::bit(4096)) AS d
+           FROM %I t
+          WHERE t.%I IS NOT NULL
+          ORDER BY t.%I <~> $1::bit(4096)
+          LIMIT $2
+       ) sub',
+    p_embedding_column, p_embedding_column, p_embedding_column,
+    p_table_name, p_embedding_column, p_embedding_column
+  );
+  EXECUTE v_sql INTO v_result USING p_query, greatest(p_k, 1);
+  RETURN v_result;
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE EXCEPTION 'Table "%" does not exist', p_table_name;
+  WHEN undefined_column THEN
+    RAISE EXCEPTION 'Column "%" does not exist on table "%"', p_embedding_column, p_table_name;
+END;
+$$;
