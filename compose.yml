@@ -168,6 +168,7 @@ services:
       - ./volumes/logs/swagger:/logs/swagger:ro
       - ./volumes/logs/bun_runner:/logs/bun_runner:ro
       - ./volumes/app:/app
+      - ./volumes/data:/data
     networks:
       - nocodenation_playground_network
 
@@ -179,6 +180,7 @@ services:
       - "8104:3000"
     volumes:
       - ./volumes/app:/app
+      - ./volumes/data:/data
       - ./volumes/build_info:/build_info
       - ./volumes/logs/bun_runner:/logs
     healthcheck:

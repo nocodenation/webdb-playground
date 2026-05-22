@@ -141,7 +141,13 @@ When asked about logs for any service, check `/logs`:
 
 ## Application
 
-When asked to create or update application, UI, node app, bun app or somentring like that - create an SSR React application and put that into `/app` folder.
+When asked to create or update application, UI, node app, bun app or something like that - create an SSR React application and put that into `/app` folder.
 Each edit should increase "version" in `package.json` file of that app.
 If user asks about issues of the application check logs located in `/logs/bun_runner` the see issues with installing dependencies, building application or running application
+When working (creating or modifying) with `package.json` file - put it into `/tmp/package.json` first, and only when all creations and edits are done copy it to `/app/package.json` - it should be the last file edited (or created) in `/app`.
+`/data` directory, that is mounted to this container, is also mounted as `/data` to a nodejs app runner container.
+---
 
+## Data
+
+When asked about working or manipulating any data (For example, reading PDFs, images, etc), check `/data` directory. This directory is used by user to upload files for you and for node application runner
