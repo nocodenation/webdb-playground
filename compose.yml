@@ -191,6 +191,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 5m
+    networks:
+      - nocodenation_playground_network
 
 networks:
   nocodenation_playground_network:
