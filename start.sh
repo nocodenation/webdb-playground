@@ -47,7 +47,7 @@ for template in "${PGADMIN_TEMPLATES_DIR}"/*; do
   filename="$(basename "$template")"
   outfile="${PGADMIN_OUTPUT_DIR}/${filename}"
   echo "Rendering pgadmin template: ${filename}"
-  rm -f "$outfile"
+  rm -rf "$outfile"
   render_template "$template" > "$outfile"
 done
 
@@ -58,7 +58,7 @@ for template in "${NGINX_TEMPLATES_DIR}"/*; do
   mkdir -p "$NGINX_OUTPUT_DIR"
   outfile="${NGINX_OUTPUT_DIR}/${filename}"
   echo "Rendering nginx template: ${filename}"
-  rm -f "$outfile"
+  rm -rf "$outfile"
   render_template "$template" > "$outfile"
   # Replace API_KEY_PLACEHOLDER with API_KEY from .env
   API_KEY="$(grep -E '^API_KEY=' "$ENV_FILE" | cut -d'=' -f2- | tr -d '"')"

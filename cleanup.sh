@@ -11,7 +11,7 @@ NGINX_OUTPUT_DIR="${SCRIPT_DIR}/config/nginx"
 for template in "${PGADMIN_TEMPLATES_DIR}"/*; do
   [[ -f "$template" ]] || continue
   filename="$(basename "$template")"
-  rm -f "${PGADMIN_OUTPUT_DIR}/${filename}"
+  rm -rf "${PGADMIN_OUTPUT_DIR}/${filename}"
   echo "Removed: config/pgadmin/${filename}"
 done
 
@@ -19,6 +19,6 @@ done
 for template in "${NGINX_TEMPLATES_DIR}"/*; do
   [[ -f "$template" ]] || continue
   filename="$(basename "$template")"
-  rm -f "${NGINX_OUTPUT_DIR}/${filename}"
+  rm -rf "${NGINX_OUTPUT_DIR}/${filename}"
   echo "Removed: config/nginx/${filename}"
 done
