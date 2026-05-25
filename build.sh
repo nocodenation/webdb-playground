@@ -2,13 +2,16 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_TAG="webdb-playground-opencode:latest"
-CONTEXT="${SCRIPT_DIR}/config/opencode"
 
-# Drop any existing image so the build is forced from scratch
-docker image rm "$IMAGE_TAG" >/dev/null 2>&1 || true
+build_image() {
+  local tag="$1"
+  local context="$2"
+  docker image rm "$tag" >/dev/null 2>&1 || true
+  echo "Building ${tag} from ${context}..."
+  docker build --no-cache -t "$tag" "$context"
+}
 
-echo "Building ${IMAGE_TAG} from ${CONTEXT}..."
-docker build --no-cache -t "$IMAGE_TAG" "$CONTEXT"
+build_image "webdb-playground/opencode:latest" "${SCRIPT_DIR}/config/opencode"
+build_image "webdb-playground/bun-runner:latest" "${SCRIPT_DIR}/config/bun_runner"
 
 echo "Done."
