@@ -29,6 +29,13 @@ import { getEncoding } from "js-tiktoken"
 import { extractText, getDocumentProxy } from "unpdf"
 
 // === Config ===
+/*
+TODO:
+ - add OpenAI embedding model support (with 4096-bit vectors as well) if user have provided OPENCODE_OPENAI_KEY.
+ - Do not use self-hosted embedding if OPENCODE_EMBEDDING_HOST and OPENCODE_EMBEDDING_MODEL are not provided
+ - If user defined both OPENCODE_EMBEDDING_HOST+OPENCODE_EMBEDDING_MODEL, and OPENCODE_OPENAI_KEY - should give user a choice which embedding to use
+ - If neither OPENCODE_EMBEDDING_HOST+OPENCODE_EMBEDDING_MODEL, nor OPENCODE_OPENAI_KEY provided - the tool should not try to do anything and report LLM why it can not ingest pdfs
+ */
 const DEFAULT_POSTGREST = "http://postgrest_app:3000"
 const EMBED_DIMS = 4096 // llama-embed-nemotron-8b output; matches bit(4096) column
 const CHUNK_TOKENS = 400
