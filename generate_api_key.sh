@@ -28,9 +28,17 @@ signature=$(printf '%s.%s' "$header" "$payload" \
 
 token="${header}.${payload}.${signature}"
 
-# Update API_KEY in .env
+# Update API_KEY in .env (handle GNU vs BSD sed)
+sed_inplace() {
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
+}
+
 if grep -q '^API_KEY=' "$ENV_FILE"; then
-  sed -i '' "s|^API_KEY=.*|API_KEY=\"${token}\"|" "$ENV_FILE"
+  sed_inplace "s|^API_KEY=.*|API_KEY=\"${token}\"|" "$ENV_FILE"
 else
   echo "API_KEY=\"${token}\"" >> "$ENV_FILE"
 fi

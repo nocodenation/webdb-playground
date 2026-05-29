@@ -15,11 +15,19 @@ fi
 
 # 1. Stop existing containers
 echo "Stopping existing containers..."
-"${SCRIPT_DIR}/stop.sh"
+"${SCRIPT_DIR}/down.sh"
 
 # 2. Generate API key (updates API_KEY in .env)
 echo "Generating API key..."
 "${SCRIPT_DIR}/generate_api_key.sh"
+
+sed_inplace() {
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
+}
 
 # 3. Render a template file by replacing {{ VAR_NAME }} placeholders with .env values
 render_template() {
@@ -37,27 +45,45 @@ render_template() {
 for template in "${PGADMIN_TEMPLATES_DIR}"/*; do
   [[ -f "$template" ]] || continue
   filename="$(basename "$template")"
+  outfile="${PGADMIN_OUTPUT_DIR}/${filename}"
   echo "Rendering pgadmin template: ${filename}"
-  render_template "$template" > "${PGADMIN_OUTPUT_DIR}/${filename}"
+  rm -rf "$outfile"
+  render_template "$template" > "$outfile"
 done
 
 # 4. Render nginx templates
 for template in "${NGINX_TEMPLATES_DIR}"/*; do
   [[ -f "$template" ]] || continue
   filename="$(basename "$template")"
-  echo "Rendering nginx template: ${filename}"
   mkdir -p "$NGINX_OUTPUT_DIR"
-  render_template "$template" > "${NGINX_OUTPUT_DIR}/${filename}"
+  outfile="${NGINX_OUTPUT_DIR}/${filename}"
+  echo "Rendering nginx template: ${filename}"
+  rm -rf "$outfile"
+  render_template "$template" > "$outfile"
   # Replace API_KEY_PLACEHOLDER with API_KEY from .env
   API_KEY="$(grep -E '^API_KEY=' "$ENV_FILE" | cut -d'=' -f2- | tr -d '"')"
-  sed -i '' "s|API_KEY_PLACEHOLDER|${API_KEY}|g" "${NGINX_OUTPUT_DIR}/${filename}"
+  sed_inplace "s|API_KEY_PLACEHOLDER|${API_KEY}|g" "${NGINX_OUTPUT_DIR}/${filename}"
 done
 
 
-# 5. Ensure shared network exists
+# 5. Ensure log directories exist and are writable by containers that
+#    run as non-root (pgadmin_db, postgrest, nginx workers).
+LOGS_DIR="${SCRIPT_DIR}/volumes/logs"
+for svc in postgres pgadmin_db pgadmin proxy swagger; do
+  mkdir -p "${LOGS_DIR}/${svc}"
+  chmod 0777 "${LOGS_DIR}/${svc}"
+done
+
+# 6. Ensure shared network exists
 docker network inspect nocodenation_playground_network >/dev/null 2>&1 \
   || docker network create nocodenation_playground_network
 
-# 6. Start containers
+# 7. Start containers
 echo "Starting containers..."
 docker compose up -d
+
+echo "pgAdmin is available on:          http://localhost:8100"
+echo "REST interface is available on:   http://localhost:8101"
+echo "Swagger UI is available on:       http://localhost:8102"
+echo "OpenCode is available on:         http://localhost:8103"
+echo "Node app is available on:         http://localhost:8104"

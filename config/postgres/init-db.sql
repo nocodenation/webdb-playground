@@ -71,7 +71,7 @@ SELECT key, value FROM json_each_text(v_columns)
     WHEN 'string'     THEN v_pgtype := 'text';
 WHEN 'number'     THEN v_pgtype := 'numeric';
 WHEN 'datetime'   THEN v_pgtype := 'timestamp';
-WHEN 'vector'     THEN v_pgtype := 'vector(768)';
+WHEN 'vector'     THEN v_pgtype := 'vector(4096)';
 WHEN 'seqnumber'  THEN v_pgtype := 'numeric';
 ELSE RAISE EXCEPTION 'Unsupported type "%" for column "%". Supported: string, number, datetime, vector, seqnumber', v_val, v_key;
 END CASE;
@@ -143,8 +143,12 @@ BEGIN
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE c.relname = v_idx_name AND n.nspname = v_schema
   ) THEN
+      -- Binary-quantized HNSW index: the column stays vector(4096) (which
+      -- HNSW can't index directly because of the 2000-dim limit), but the
+      -- binary_quantize() expression projects to bit(4096) which HNSW supports
+      -- up to 64000 dims. Queries must use the same expression to hit the index.
       EXECUTE format(
-          'CREATE INDEX %I ON %I.%I USING hnsw (%I vector_l2_ops) WITH (m = 4, ef_construction = 10)',
+          'CREATE INDEX %I ON %I.%I USING hnsw ((binary_quantize(%I)::bit(4096)) bit_hamming_ops) WITH (m = 4, ef_construction = 10)',
           v_idx_name, v_schema, p_table_name, p_embedding_column_name
       );
 END IF;
@@ -208,7 +212,7 @@ EXECUTE format('ALTER FUNCTION %s OWNER TO api_user', full_function_name);
 result := jsonb_build_object(
         'success', TRUE,
         'function_name', full_function_name,
-        'endpoint', 'https://rest.mywebdb.liquid.mx/rpc/' || function_name,
+        'endpoint', 'http://postgrest_app:3000/rpc/' || function_name,
         'created_at', NOW()
     );
 
@@ -227,3 +231,67 @@ ALTER FUNCTION public.deploy_function OWNER TO api_user;
 
 
 CREATE EXTENSION vector;
+
+
+-- Function: find_closest_vectors
+-- Two-stage K-nearest-neighbour search over any table with a vector(4096) column:
+--   1. Use the binary-quantized HNSW index to pull (p_k * p_rerank_factor) candidates
+--      by Hamming distance (very fast, slightly noisy).
+--   2. Rerank those candidates by exact cosine distance, return the top p_k.
+-- p_query is a pgvector literal string: "[v1,v2,...,v4096]" of 4096 floats.
+-- Returns a JSONB array of the p_k nearest rows, ordered closest-first: the
+-- embedding column is omitted and a "distance" field (cosine, lower = more
+-- similar) is added.
+CREATE OR REPLACE FUNCTION public.find_closest_vectors(
+    p_table_name text,
+    p_embedding_column text,
+    p_query text,
+    p_k int DEFAULT 5,
+    p_rerank_factor int DEFAULT 4
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  v_result jsonb;
+  v_sql text;
+BEGIN
+  v_sql := format(
+    'SELECT coalesce(jsonb_agg(obj ORDER BY d), ''[]''::jsonb)
+       FROM (
+         SELECT (to_jsonb(reranked) - %L)
+                || jsonb_build_object(''distance'', reranked.d) AS obj,
+                reranked.d
+           FROM (
+             SELECT cand.*, (cand.%I <=> $1::vector(4096)) AS d
+               FROM (
+                 SELECT *
+                   FROM %I
+                  WHERE %I IS NOT NULL
+                  ORDER BY binary_quantize(%I)::bit(4096)
+                           <~> binary_quantize($1::vector(4096))
+                  LIMIT $2
+               ) cand
+              ORDER BY d
+              LIMIT $3
+           ) reranked
+       ) sub',
+    p_embedding_column,   -- jsonb subtract key
+    p_embedding_column,   -- cosine distance column
+    p_table_name,         -- inner FROM
+    p_embedding_column,   -- WHERE IS NOT NULL
+    p_embedding_column    -- binary_quantize column
+  );
+  EXECUTE v_sql INTO v_result
+    USING p_query,
+          greatest(p_k, 1) * greatest(p_rerank_factor, 1),
+          greatest(p_k, 1);
+  RETURN v_result;
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE EXCEPTION 'Table "%" does not exist', p_table_name;
+  WHEN undefined_column THEN
+    RAISE EXCEPTION 'Column "%" does not exist on table "%"', p_embedding_column, p_table_name;
+END;
+$$;

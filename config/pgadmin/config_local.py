@@ -4,7 +4,7 @@ WEBSERVER_REMOTE_USER = "X-Authentication-Email"
 MASTER_PASSWORD = False
 MASTER_PASSWORD_REQUIRED = False
 ALLOW_SAVE_PASSWORD = True
-SESSION_DB_PATH = "/var/lib/sessions"
+SESSION_DB_PATH = "/var/lib/pgadmin/sessions"
 
 ENHANCED_COOKIE_PROTECTION = False
 WTF_CSRF_CHECK_DEFAULT = False
