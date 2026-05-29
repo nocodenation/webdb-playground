@@ -163,7 +163,9 @@ services:
       POSTGREST_API_KEY: ${API_KEY:-}
     volumes:
       - ./config/opencode/instructions.md:/opencode/instructions.md:ro
-      - ./config/opencode/skills:/opencode/skills:ro
+      - ./config/opencode/skills:/root/.config/opencode/skills
+      - ./config/opencode/package.json:/root/.config/opencode/package.json
+      - ./config/opencode/tools:/root/.config/opencode/tools:ro
       - ./volumes/logs/postgres:/logs/postgres:ro
       - ./volumes/logs/pgadmin_db:/logs/pgadmin_db:ro
       - ./volumes/logs/pgadmin:/logs/pgadmin:ro

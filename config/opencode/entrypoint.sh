@@ -66,7 +66,6 @@ fi
 printf '{
   "model": "%s",
   "instructions": ["/opencode/instructions.md"],
-  "skills": {"paths": ["/opencode/skills"]},
   "provider": {
 %s
   },

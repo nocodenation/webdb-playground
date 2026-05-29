@@ -81,7 +81,7 @@ curl -s -X POST http://postgrest_app:3000/rpc/create_table \
 ```
 
 Supported column types: `string` → text, `number` → numeric, `datetime` → timestamp,
-`vector` → bit(4096), `seqnumber` → numeric with auto-increment sequence.
+`vector` → vector(4096), `seqnumber` → numeric with auto-increment sequence.
 See the **Embeddings** section below for how `vector` columns are populated.
 
 ### `create_vector_index` — add an HNSW index on a vector column
@@ -93,21 +93,28 @@ curl -s -X POST http://postgrest_app:3000/rpc/create_vector_index \
   -d '{"p_table_name": "my_table", "p_embedding_column_name": "embedding"}'
 ```
 
-### `find_closest_vector` — K-nearest-neighbour search over a `vector` column
+### `find_closest_vectors` — K-nearest-neighbour search over a `vector` column
 
-Generic similarity search over any table with a `vector` (`bit(4096)`) column.
-`p_query` is a 4096-character bit string produced by embedding and binarizing the
-search text (see the **Embeddings** section).
+Two-stage similarity search over any table with a `vector(4096)` column:
+1. Fast pre-filter using pgvector's binary-quantized HNSW index (Hamming distance)
+   to fetch `p_k * p_rerank_factor` candidates.
+2. Rerank those candidates by exact cosine distance, returning the top `p_k`.
+
+`p_query` is a pgvector literal `"[v1,v2,...,v4096]"` of 4096 floats — the raw
+embedding output (no binarization needed; see the **Embeddings** section).
 
 ```bash
-curl -s -X POST http://postgrest_app:3000/rpc/find_closest_vector \
+curl -s -X POST http://postgrest_app:3000/rpc/find_closest_vectors \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"p_table_name": "docs", "p_embedding_column": "embedding", "p_query": "0101...", "p_k": 5}'
+  -d '{"p_table_name": "docs", "p_embedding_column": "embedding", "p_query": "[0.12,-0.34,...]", "p_k": 5, "p_rerank_factor": 4}'
 ```
 
+`p_rerank_factor` defaults to 4 (so 20 binary candidates → 5 cosine-reranked
+results); raise it for better recall at the cost of more cosine computations.
+
 Returns a JSON array of the `p_k` nearest rows — the embedding column is omitted
-and a `distance` field is added (lower = more similar).
+and a `distance` field (cosine, lower = more similar) is added.
 
 ### `deploy_function` — create or replace a PostgreSQL function and expose it via PostgREST
 
@@ -152,46 +159,46 @@ echo $OPENCODE_EMBEDDING_HOST    # e.g. http://embedding_host:8801
 echo $OPENCODE_EMBEDDING_MODEL   # e.g. llama-embed-nemotron-8b
 ```
 
-The model returns **4096-dimensional** float vectors. They are stored in the
-database as **binary-quantized** bit vectors (`bit(4096)`): each float becomes one
-bit — `1` if it is greater than `0`, otherwise `0`. This keeps vectors compact and
-lets pgvector build an HNSW index, which a plain `vector(4096)` cannot have (HNSW
-caps at 2000 float dimensions). Binary quantization depends only on the sign of
-each value, so whether the model's output is normalized does not matter.
+The model returns **4096-dimensional** float vectors. They are stored as
+`vector(4096)` — the raw floats — and pgvector applies **binary quantization at
+index time** via an expression HNSW index over `binary_quantize(embedding)::bit(4096)`.
+This sidesteps HNSW's 2000-dim limit on the `vector` type (the `bit` type supports
+up to 64000 dims) while keeping the full vectors available for cosine reranking.
 
-### Generate and binarize an embedding
+### Generate an embedding
 
 ```bash
 curl -s -X POST "$OPENCODE_EMBEDDING_HOST/v1/embeddings" \
   -H "Content-Type: application/json" \
   -d "{\"model\": \"$OPENCODE_EMBEDDING_MODEL\", \"input\": \"text to embed\"}" \
-  | jq -r '(.data[0].embedding // .embedding) | map(if . > 0 then "1" else "0" end) | add'
+  | jq -r '(.data[0].embedding // .embedding) | "[" + (map(tostring) | join(",")) + "]"'
 ```
 
-This prints a 4096-character string of `0`/`1` — exactly the value to store in a
-`vector` column. The `(.data[0].embedding // .embedding)` filter accepts both the
+This prints a pgvector literal `"[v1,v2,...,v4096]"` — store it directly in a
+`vector` column. The `(.data[0].embedding // .embedding)` filter accepts both
 OpenAI-style (`/v1/embeddings`) and llama.cpp-native (`/embedding`) response shapes.
 
 ### Vector search workflow
 
-1. Create a table with a `vector` column (`create_table` maps `vector` → `bit(4096)`):
+1. Create a table with a `vector` column (`create_table` maps `vector` → `vector(4096)`):
    ```json
    {"p_table_name": "docs", "p_columns": {"id": "seqnumber", "content": "string", "embedding": "vector"}, "p_primary_keys": ["id"]}
    ```
-2. For each row, embed its text, binarize it (command above), and insert the
-   resulting 4096-char bit string into the `embedding` column.
-3. Add an HNSW index with `create_vector_index` — it uses Hamming distance
-   (`bit_hamming_ops` / the `<~>` operator).
-4. To search, embed and binarize the query text the same way, then call the
-   built-in `find_closest_vector` RPC with the table name, embedding column, and
-   bit string:
+2. For each row, embed its text and insert the resulting `"[v1,v2,...]"` literal
+   into the `embedding` column. No binarization on the client side.
+3. Add an HNSW index with `create_vector_index` — it indexes
+   `binary_quantize(embedding)::bit(4096)` with `bit_hamming_ops` so the 4096-dim
+   `vector` column is searchable despite HNSW's 2000-dim limit on float vectors.
+4. To search, embed the query text the same way, then call `find_closest_vectors`
+   with the vector literal. It does a two-stage search: binary Hamming prefilter
+   for speed, exact cosine rerank for precision.
    ```bash
-   curl -s -X POST http://postgrest_app:3000/rpc/find_closest_vector \
+   curl -s -X POST http://postgrest_app:3000/rpc/find_closest_vectors \
      -H "Authorization: Bearer <token>" \
      -H "Content-Type: application/json" \
-     -d "{\"p_table_name\": \"docs\", \"p_embedding_column\": \"embedding\", \"p_query\": \"$BITS\", \"p_k\": 5}"
+     -d "{\"p_table_name\": \"docs\", \"p_embedding_column\": \"embedding\", \"p_query\": \"$VEC\", \"p_k\": 5}"
    ```
-   It returns the nearest rows ordered by `distance` (lower = more similar).
+   It returns the nearest rows ordered by `distance` (cosine; lower = more similar).
 
 ---
 
